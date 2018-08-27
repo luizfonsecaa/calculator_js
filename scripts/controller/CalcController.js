@@ -17,23 +17,26 @@ class CalcController {
         let interval = setInterval(()=>{
             this.setDisplayDateTime();
         }, 1000);
+        this.setLastNumberToDisplay();
     }
 
-    //metodo que executa multiplos eventos 
+    //metodo que executa multiplos eventos
     addEventListenerAll(element, events, fn){
         events.split(' ').forEach(event =>{
             element.addEventListener(event, fn, false);
         });
-    } 
+    }
 
     //apaga todos os elemtos da minha operação
     clearAll(){
         this._operation = [];
+        this.setLastNumberToDisplay();
     }
 
     //exclui o ultimo elemento da minhas operações
     clearEntry(){
         this._operation.pop();
+        this.setLastNumberToDisplay();
     }
 
     //pego a ultima posição do array
@@ -46,14 +49,14 @@ class CalcController {
         this._operation[this._operation.length -1] = value;
     }
 
-    //verifico se ele e algum operador 
+    //verifico se ele e algum operador
     isOperator(value){
         return (['+','-','*','%','/'].indexOf(value) > -1)
     }
 
     //adiciono o valor no array
     pushOperation(value){
-        this._operation.push(value); 
+        this._operation.push(value);
         if(this._operation.length > 3){
             this.calc();
         }
@@ -61,19 +64,46 @@ class CalcController {
 
     // faz o calculo quando o array for igual a 3
     calc(){
-        let last = this._operation.pop();
+        let last = '';
+        if(this._operation.length > 3){
+             last = this._operation.pop();
+        }
         let result = eval(this._operation.join(""));
-        this._operation = [result, last];
+        if(last == "%"){
+            //igual a ele mesmo dividido por 100
+            result /= 100;
+            this._operation = [result];
+        }else{
+            this._operation = [result];
+            if(last) this._operation.push(last);
+        }
+
+        this.setLastNumberToDisplay();
     }
+
+    //pega o ultimo valor do array e seta no display caso o array for branco adiciono '0'
+    setLastNumberToDisplay(){
+        let lastNumber;
+        for (let i = this._operation.length-1; i >= 0; i--){
+            if(!this.isOperator(this._operation[i])){
+                lastNumber = this._operation[i];
+                break;
+            }
+        }
+        if(!lastNumber) lastNumber = 0;
+        this.displayCalc = lastNumber;
+    }
+
     //adiciona uma um elemento no array das minhas operações
     addOperation(value){
         if(isNaN(this.getLastOperation())){
             if(this.isOperator(value)){
                 this.setLastOperation(value);
             }else if(isNaN(value)){
-               
+
             }else{
                 this.pushOperation(value);
+                this.setLastNumberToDisplay();
             }
         }else{
             if(this.isOperator(value)){
@@ -117,9 +147,9 @@ class CalcController {
                 this.addOperation('%');
                 break;
             case 'igual':
-               
+                this.calc();
                 break;
-                
+
             case 'ponto':
                 this.addOperation('.');
                 break;
@@ -138,7 +168,7 @@ class CalcController {
             default:
                 this.setError();
                 break;
-                
+
         }
 
     }
@@ -157,7 +187,7 @@ class CalcController {
         });
     }
 
-    //metodo que passsa a hora e data para o display da calculadora 
+    //metodo que passsa a hora e data para o display da calculadora
     setDisplayDateTime(){
         this.displayDate = this.currentDate.toLocaleDateString(this._pais, {
             day: "2-digit",
