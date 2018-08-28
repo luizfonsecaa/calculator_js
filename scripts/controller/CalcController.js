@@ -1,6 +1,10 @@
 class CalcController {
 
     constructor(){
+        this._audio = new Audio('click.mp3');
+        this._audioOnOff = false;
+        this._lastOperator = '';
+        this._lastNumber = '';
         this._operation = [];
         this._pais = 'pt-BR';
         this._displayCalcEl = document.querySelector("#display");
@@ -9,6 +13,29 @@ class CalcController {
         this._currentDate;
         this.initialize();
         this.initButtonsEvents();
+        this.initkeyboard();
+        this.pasteFromClipboard();
+        window.focus();
+        console.log(this._audioOnOff);
+    }
+
+    //copiando o display
+    copyToClipboard(){
+        let input = document.createElement('input');
+        input.value = this.displayCalc;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('Copy');
+        input.remove();
+
+    }
+    //colando no display
+    pasteFromClipboard(){
+        document.addEventListener('paste', e=>{
+            let text = e.clipboardData.getData('Text');
+            this.displayCalc = parseFloat(text);
+            console.log(text);
+        });
     }
 
     //metodo responsavel em apresentar hora e data acada 1 segundo
@@ -18,8 +45,25 @@ class CalcController {
             this.setDisplayDateTime();
         }, 1000);
         this.setLastNumberToDisplay();
+        document.querySelectorAll('.btn-ac').forEach(btn=>{
+            btn.addEventListener('dblclick', e=>{
+
+                this.toggleAudio();
+
+            });
+        });
     }
 
+    toggleAudio(){
+        this._audioOnOff = !this._audioOnOff;
+    }
+
+    playAudio(){
+        if(this._audioOnOff){
+            this._audio.currentTime = 0;
+            this._audio.play();
+        }
+    }
     //metodo que executa multiplos eventos
     addEventListenerAll(element, events, fn){
         events.split(' ').forEach(event =>{
@@ -31,6 +75,8 @@ class CalcController {
     clearAll(){
         this._operation = [];
         this.setLastNumberToDisplay();
+        this._lastNumber = "";
+        this.lastOperation = "";
     }
 
     //exclui o ultimo elemento da minhas operações
@@ -61,14 +107,33 @@ class CalcController {
             this.calc();
         }
     }
+    getResult(){
+        try{
+            return eval(this._operation.join(""));
+        }catch(e){
+          setTimeout(()=>{
+            console.log(e);
+            this.setError();
+          }, 1);
+        }
+    }
 
     // faz o calculo quando o array for igual a 3
     calc(){
         let last = '';
-        if(this._operation.length > 3){
-             last = this._operation.pop();
+        this._lastOperator = this.getLastItem();
+        if(this._operation.length < 3){
+            let firstItem = this._operation[0];
+            this._operation = [firstItem, this._lastOperator, this._lastNumber];
         }
-        let result = eval(this._operation.join(""));
+
+        if(this._operation.length > 3){
+            last = this._operation.pop();
+            this._lastNumber   = this.getResult();
+        }else if(this._operation.length == 3){
+            this._lastNumber   = this.getLastItem(false);
+        }
+        let result = this.getResult();
         if(last == "%"){
             //igual a ele mesmo dividido por 100
             result /= 100;
@@ -80,16 +145,67 @@ class CalcController {
 
         this.setLastNumberToDisplay();
     }
-
-    //pega o ultimo valor do array e seta no display caso o array for branco adiciono '0'
-    setLastNumberToDisplay(){
-        let lastNumber;
+    initkeyboard(){
+        document.addEventListener('keyup', e=>{
+            this.playAudio();
+            switch(e.key){
+                case 'Escape':
+                    this.clearAll();
+                    break;
+                case 'Backspace':
+                    this.clearEntry();
+                    break;
+                case '+':
+                case '-':
+                case '*':
+                case '/':
+                case '%':
+                    this.addOperation(e.key);
+                break;
+                case 'Enter':
+                case '=':
+                    this.calc();
+                    break;
+                case '.':
+                case ',':
+                    this.addDot();
+                    break;
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                    this.addOperation(parseInt(e.key));
+                    break;
+                case 'c':
+                    if(e.ctrlKey) this.copyToClipboard();
+                    break;
+            }
+        });
+    }
+    //trago o ultimo operador setado (true para operador e false para numero)
+    getLastItem(isOperator = true){
+        let lastItem;
         for (let i = this._operation.length-1; i >= 0; i--){
-            if(!this.isOperator(this._operation[i])){
-                lastNumber = this._operation[i];
+            if(this.isOperator(this._operation[i]) == isOperator){
+                lastItem = this._operation[i];
                 break;
             }
         }
+        if(!lastItem){
+            lastItem = (isOperator) ? this._lastOperator : this.lastNumber;
+        }
+        return lastItem;
+    }
+
+    //apresenta no display o ultimo valor caso nao tenha aficiona o zero
+    setLastNumberToDisplay(){
+        let lastNumber = this.getLastItem(false);
         if(!lastNumber) lastNumber = 0;
         this.displayCalc = lastNumber;
     }
@@ -99,31 +215,41 @@ class CalcController {
         if(isNaN(this.getLastOperation())){
             if(this.isOperator(value)){
                 this.setLastOperation(value);
-            }else if(isNaN(value)){
-
             }else{
                 this.pushOperation(value);
                 this.setLastNumberToDisplay();
             }
+
         }else{
             if(this.isOperator(value)){
                 this.pushOperation(value);
             }else{
                 let newValue = this.getLastOperation().toString() + value.toString();
-                this.setLastOperation(parseInt(newValue));
+                this.setLastOperation(newValue);
                 this.setLastNumberToDisplay();
             }
         }
-        console.log('A',this._operation);
+
     }
 
     //metodo que dispara erro no display
     setError(){
         this.displayCalc = 'Error';
     }
-
+    addDot() {
+        let lastOperation = this.getLastOperation();
+        if (typeof lastOperation === "string" && lastOperation && lastOperation.split('').indexOf('.') > -1) return;
+        if (this.isOperator(lastOperation) || !lastOperation) {
+            this.pushOperation('0.');
+        } else {
+            this.setLastOperation(lastOperation.toString() + '.');
+        }
+        this.setLastNumberToDisplay();
+        console.log(lastOperation);
+    }
     //metodo responsavel por verificar qual o tipo do botao quando for clicado
     execBtn(value){
+        this.playAudio();
         switch(value){
             case 'ac':
                 this.clearAll();
@@ -151,7 +277,7 @@ class CalcController {
                 break;
 
             case 'ponto':
-                this.addOperation('.');
+                this.addDot();
                 break;
             case '0':
             case '1':
@@ -218,6 +344,10 @@ class CalcController {
         return this._displayCalcEl.innerHTML;
     }
     set displayCalc(value){
+        if(value.toString().length > 10){
+            this.setError();
+            return;
+        }
         this._displayCalcEl.innerHTML = value;
     }
 
